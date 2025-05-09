@@ -10,6 +10,13 @@ import winreg
 import tempfile
 import shutil
 from typing import List, Optional, Any
+import logging
+
+logging.basicConfig(
+    filename='errores_main.log',
+    level=logging.ERROR,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 cuenta_seleccionada: Optional[str] = None
 ruta_excel: Optional[str] = None
@@ -28,6 +35,7 @@ try:
     icon_path = os.path.join(base_path, "config", "icono.ico")
     root.iconbitmap(icon_path)
 except (FileNotFoundError, OSError) as e:
+    logging.error("No se pudo cargar el icono", exc_info=True)
     print(f"No se pudo cargar el icono: {e}")
 
 # Cargar imagen de portada
@@ -37,9 +45,10 @@ try:
     cover_image = cover_image.resize((500, 90))
     cover_img = ImageTk.PhotoImage(cover_image)
     etiqueta_cover = tk.Label(root, image=cover_img)
-    etiqueta_cover.image = cover_img  # Para evitar que sea eliminada por el recolector de basura
+    etiqueta_cover.image = cover_img  # Para evitar que sea eliminada por el recolector
     etiqueta_cover.pack(pady=10)
 except Exception as e:
+    logging.error("No se pudo cargar la imagen de portada", exc_info=True)
     print(f"No se pudo cargar la imagen de portada: {e}")
 
 # Variables para mostrar nombres de archivos (deben ir después de crear root)
@@ -66,8 +75,10 @@ def obtener_perfiles_outlook() -> List[str]:
             except FileNotFoundError:
                 continue
         if len(perfiles) == 1:
+            logging.error("No se encontraron perfiles.", exc_info=True)
             perfiles.append("No se encontraron perfiles.")
     except Exception as e:
+        logging.error("Error al obtener perfiles", exc_info=True)
         perfiles.append("Error al obtener perfiles")
     return perfiles
 
@@ -83,6 +94,7 @@ def obtener_ruta_outlook() -> str:
     for ruta in rutas:
         if os.path.exists(ruta):
             return ruta
+        logging.error("No se encontró Outlook.", exc_info=True)
     raise FileNotFoundError("No se encontró Outlook.")
 
 def iniciar_outlook_con_perfil(perfil: str) -> None:
@@ -91,6 +103,7 @@ def iniciar_outlook_con_perfil(perfil: str) -> None:
         subprocess.Popen([ruta_outlook, "/profile", perfil])
         time.sleep(7)
     except Exception as e:
+        logging.error("No se pudo iniciar Outlook", exc_info=True)
         print(f"No se pudo iniciar Outlook: {e}")
 
 def obtener_cuentas_activas(max_intentos: int = 10, intervalo: int = 1) -> List[str]:
@@ -101,8 +114,11 @@ def obtener_cuentas_activas(max_intentos: int = 10, intervalo: int = 1) -> List[
             cuentas = [account.SmtpAddress for account in namespace.Accounts]
             if cuentas:
                 return cuentas
-        except Exception:  # Considera capturar errores más específicos
-            pass
+        except Exception as e:
+            messagebox.showerror("Error al obtener cuentas", f"No se pudo acceder a las cuentas de Outlook:\n{e}")
+            logging.error("No se pudo acceder a las cuentas de Outlook", exc_info=True)
+            break  # detiene el bucle si ya falló definitivamente
+
         time.sleep(intervalo)
     return []
 
@@ -149,17 +165,20 @@ def ruta_script(nombre_script: str) -> str:
 
 def ejecutar_script(nombre_script_txt: str, perfil: str, mostrar_mensaje: bool = False) -> None:
     if perfil == "Seleccione perfil...":
+        logging.error("Selecciona un perfil", exc_info=True)
         messagebox.showerror("Error", "Selecciona un perfil.")
         return
 
     global cuenta_seleccionada, ruta_excel, ruta_docx
     if not cuenta_seleccionada:
+        logging.error("Selecciona una cuenta asociada", exc_info=True)
         messagebox.showerror("Error", "Selecciona una cuenta asociada.")
         return
 
     solo_envio = "timer_sent" in nombre_script_txt.lower()
 
     if not solo_envio and (not ruta_excel or not ruta_docx):
+        logging.error("Carga Excel y Word antes de continuar", exc_info=True)
         messagebox.showerror("Error", "Carga Excel y Word antes de continuar.")
         return
 
@@ -185,13 +204,17 @@ def ejecutar_script(nombre_script_txt: str, perfil: str, mostrar_mensaje: bool =
             cmd = [sys.executable, script_path] + args
 
         if not os.path.exists(script_path):
+            logging.error("No se encontró el archivo", exc_info=True)
             raise FileNotFoundError(f"No se encontró el archivo: {script_path}")
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         print(result.stdout)
 
         if result.returncode != 0:
-            messagebox.showerror("Error", f"Error:\n{result.stderr}")
+            logging.error("Error en ejecución", exc_info=True)
+            error_msg = result.stderr.strip() or "Error desconocido."
+            messagebox.showerror("Error en ejecución", f"Ocurrió un error:\n{error_msg}")
+
         else:
             if mostrar_mensaje:
                 if "timer_sent" in script_name:
@@ -203,6 +226,7 @@ def ejecutar_script(nombre_script_txt: str, perfil: str, mostrar_mensaje: bool =
                     messagebox.showinfo("Éxito", f"{script_name}.py/.exe ejecutado correctamente.")
 
     except Exception as e:
+        logging.error("No se pudo ejecutar la script", exc_info=True)
         messagebox.showerror("Error", f"No se pudo ejecutar {script_name}:\n{e}")
 
 def cargar_excel() -> None:
@@ -217,6 +241,16 @@ def cargar_docx() -> None:
     global ruta_docx
     archivo = filedialog.askopenfilename(filetypes=[("Documentos de Word", "*.docx")])
     if archivo:
+        try:
+            if os.path.getsize(archivo) == 0:
+                logging.error("El archivo .docx seleccionado está vacío", exc_info=True)
+                messagebox.showerror("Archivo vacío", "El archivo .docx seleccionado está vacío.")
+                return
+        except Exception as e:
+            logging.error("No se pudo verificar el archivo", exc_info=True)
+            messagebox.showerror("Error al validar archivo", f"No se pudo verificar el archivo:\n{e}")
+            return
+
         ruta_docx = archivo
         nombre_archivo = os.path.basename(archivo)
         ruta_docx_var.set(f"... {nombre_archivo}   ✔️")
@@ -224,9 +258,11 @@ def cargar_docx() -> None:
 def ejecutar_timer_send() -> None:
     perfil = combo_cuentas.get()
     if perfil == "Seleccione perfil...":
+        logging.error("Selecciona un perfil", exc_info=True)
         messagebox.showerror("Error", "Selecciona un perfil.")
         return
     if not cuenta_seleccionada:
+        logging.error("Selecciona una cuenta asociada", exc_info=True)
         messagebox.showerror("Error", "Selecciona una cuenta asociada.")
         return
 
@@ -240,6 +276,7 @@ def ejecutar_timer_send() -> None:
         exe_path = os.path.join(exe_dir, "timer_sent.exe")
 
         if not os.path.exists(exe_path):
+            logging.error("No se encontró el archivo", exc_info=True)
             raise FileNotFoundError(f"No se encontró el archivo: {exe_path}")
 
         # Agrega log temporal
@@ -248,6 +285,7 @@ def ejecutar_timer_send() -> None:
         result = subprocess.run([exe_path, cuenta_seleccionada], capture_output=True, text=True)
 
         if result.returncode != 0:
+            logging.error("Error ejecutando timer_sent.exe", exc_info=True)
             messagebox.showerror("Error", f"Error ejecutando timer_sent.exe:\n{result.stderr}")
         else:
             enviados = result.stdout.strip()
@@ -257,6 +295,7 @@ def ejecutar_timer_send() -> None:
                 messagebox.showinfo("Ejecutado", f"Salida:\n{result.stdout}")
 
     except Exception as e:
+        logging.error("No se pudo ejecutar timer_sent", exc_info=True)
         messagebox.showerror("Error", f"No se pudo ejecutar timer_sent:\n{e}")
 
 def crear_boton(nombre_script: str, texto_boton: str) -> tk.Button:

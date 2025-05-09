@@ -7,16 +7,52 @@ import os
 import sys
 import time
 import winreg
-import tempfile
-import shutil
 from typing import List, Optional, Any
 import logging
+import urllib.request
+import json
+
+__version__ = "1.0.1"  # Cambia esto con cada nueva versión que publiques
 
 logging.basicConfig(
     filename='errores_main.log',
     level=logging.ERROR,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+def verificar_actualizacion():
+    try:
+        url_api = "https://api.github.com/repos/azambrano18/crea_borradores/releases/latest"
+        with urllib.request.urlopen(url_api) as response:
+            data = json.loads(response.read())
+            ultima_version = data["tag_name"].lstrip("v")
+            assets = data["assets"]
+
+        if ultima_version != __version__:
+            if messagebox.askyesno("Actualización disponible",
+                f"Hay una nueva versión ({ultima_version}) disponible.\n¿Deseas descargarla ahora?"):
+
+                exe_dir = os.path.dirname(sys.executable)
+                archivos = {
+                    "main.exe": "CreadorBorradores_Nuevo.exe",
+                    "txt_1.exe": "txt_1_nuevo.exe",
+                    "timer_sent.exe": "timer_sent_nuevo.exe"
+                }
+
+                for asset in assets:
+                    nombre = asset["name"]
+                    if nombre in archivos:
+                        url_descarga = asset["browser_download_url"]
+                        destino = os.path.join(exe_dir, archivos[nombre])
+                        urllib.request.urlretrieve(url_descarga, destino)
+
+                messagebox.showinfo("Actualización descargada", "Se lanzará la nueva versión ahora.")
+                subprocess.Popen([os.path.join(exe_dir, "CreadorBorradores_Nuevo.exe")])
+                sys.exit()
+
+    except Exception as e:
+        print(f"No se pudo verificar actualización: {e}")
+        logging.error("Fallo al verificar actualización", exc_info=True)
 
 cuenta_seleccionada: Optional[str] = None
 ruta_excel: Optional[str] = None

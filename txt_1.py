@@ -1,10 +1,23 @@
-import sys
-import win32com.client
-import mammoth
-import pandas as pd
-import os
-import traceback
+# Librerías estándar
+import sys  # Permite trabajar con argumentos desde la línea de comandos y manejar salidas y errores
+import os  # Proporciona funciones para interactuar con el sistema de archivos (verificar rutas, etc.)
+import traceback  # Permite imprimir rastros de error detallados para depuración
+# Librerías externas
+import pandas as pd  # Utilizada para leer y manipular datos desde archivos Excel
+import win32com.client  # Permite automatizar Outlook a través de COM (crear correos, acceder a cuentas, etc.)
+import mammoth  # Convierte archivos .docx (Word) en HTML, útil para correos con formato
 
+#-------------cargar_cuerpo_desde_docx: --------------
+"""
+Carga el contenido de un archivo DOCX, lo convierte a HTML y reemplaza la variable [Nombre].
+Args:
+    archivo_docx (str): Ruta al archivo .docx que contiene el cuerpo del mensaje.
+    nombre (str): Nombre que se reemplazará en el contenido donde aparezca [Nombre].
+Returns:
+    str: Cuerpo del mensaje en formato HTML con el nombre integrado.
+Raises:
+    SystemExit: Si el archivo no existe o ocurre un error durante la conversión.
+"""
 def cargar_cuerpo_desde_docx(archivo_docx, nombre):
     try:
         if not os.path.exists(archivo_docx):
@@ -19,7 +32,20 @@ def cargar_cuerpo_desde_docx(archivo_docx, nombre):
         print(f"Error al cargar el archivo .docx con formato: {e}", file=sys.stderr)
         traceback.print_exc()
         sys.exit(1)
-
+#----------------crear_borrador----------------
+"""
+Crea un borrador en Outlook con la cuenta, destinatario, asunto y cuerpo especificados.
+Args:
+    cuenta (str): Dirección de correo del remitente.
+    destinatario (str): Dirección de correo del destinatario.
+    asunto (str): Asunto del mensaje.
+    cuerpo (str): Cuerpo del mensaje en formato HTML.
+    perfil_outlook (str, opcional): Nombre del perfil de Outlook a usar. Default es "".
+Returns:
+    bool: True si se creó el borrador correctamente.
+Raises:
+    SystemExit: Si Outlook no puede inicializarse o no se encuentra la cuenta.
+"""
 def crear_borrador(cuenta, destinatario, asunto, cuerpo, perfil_outlook=""):
     try:
         outlook = win32com.client.Dispatch("Outlook.Application")
@@ -51,6 +77,17 @@ def crear_borrador(cuenta, destinatario, asunto, cuerpo, perfil_outlook=""):
         traceback.print_exc()
         sys.exit(1)
 
+#---------------procesar_excel---------------
+"""
+Procesa el archivo Excel con las columnas 'Correo', 'Asunto' y 'Nombre', genera un cuerpo HTML para cada fila y crea un borrador en Outlook.
+Args:
+        correo_cuenta (str): Dirección de correo usada como remitente.
+        perfil_outlook (str): Perfil de Outlook a utilizar.
+        ruta_excel (str): Ruta al archivo Excel.
+        ruta_docx (str): Ruta al archivo DOCX con la plantilla del mensaje.
+ Raises:
+        SystemExit: Si faltan archivos, columnas requeridas o ocurre un error de ejecución.
+"""
 def procesar_excel(correo_cuenta, perfil_outlook="", ruta_excel=None, ruta_docx=None):
     if not ruta_excel or not os.path.exists(ruta_excel):
         sys.exit("ERROR: Ruta del archivo Excel inválida o no encontrada.")

@@ -1,10 +1,8 @@
-# Importación de librerías necesarias
 import win32com.client           # Para controlar Outlook desde Python
 import pythoncom                # Para manejar la inicialización de COM en hilos
 import time                     # Para manejar temporizadores
 import tkinter as tk            # Para construir la interfaz gráfica
 from tkinter import ttk, messagebox  # Widgets mejorados y mensajes de alerta
-from PIL import Image, ImageTk
 import threading                # Para ejecutar tareas en segundo plano
 import sys                      # Para recibir argumentos desde línea de comandos
 import os
